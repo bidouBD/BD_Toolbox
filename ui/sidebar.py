@@ -130,7 +130,7 @@ class Sidebar(ctk.CTkFrame):
 
         ctk.CTkLabel(
             logo_frame,
-            text="⚡ FFmpeg Studio",
+            text="⚡BD Toolbox",
             font=ctk.CTkFont(family="Microsoft YaHei UI", size=16, weight="bold"),
             text_color=["#111827", "#F9FAFB"],
             anchor="w",
