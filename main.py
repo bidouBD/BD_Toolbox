@@ -25,7 +25,7 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("FFmpeg Studio")
+        self.title("BD Toolbox")
         self.geometry("1280x800")
         self.minsize(1100, 600)
 
