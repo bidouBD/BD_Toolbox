@@ -1,5 +1,5 @@
 # BD_Toolbox
-**FFmpeg Studio** 是一款基于 Python 和 CustomTkinter 开发的现代视频/音频处理平台。它旨在通过直观的 GUI 界面简化复杂的 FFmpeg 命令行操作，提供压制、转换与修复功能。
+**BD_Toolbox** 是一款基于 Python 和 CustomTkinter 开发的现代视频/音频处理平台。它旨在通过直观的 GUI 界面简化复杂的 FFmpeg 命令行操作，提供压制、转换与修复功能。
 
 ---
 
