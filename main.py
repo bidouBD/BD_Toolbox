@@ -28,7 +28,15 @@ class App(ctk.CTk):
         self.title("BD Toolbox")
         self.geometry("1280x800")
         self.minsize(1100, 600)
-        self.iconbitmap(str(Path(__file__).parent / "vvrmb-7zas8-001.ico"))
+        
+        # Robust icon loading
+        try:
+            from core.ffmpeg_runner import get_resource_path
+            icon_path = get_resource_path("bd_toolbox.ico")
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
+        except Exception:
+            pass
 
         # Initial appearance
         self._is_dark = False
