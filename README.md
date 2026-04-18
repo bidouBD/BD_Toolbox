@@ -1,4 +1,4 @@
-**BD Toolbox** 是一款基于 Python 和 CustomTkinter 开发的现代视频/音频处理平台。它旨在通过直观的 GUI 界面简化复杂的 FFmpeg 命令行操作，提供专业级的压制、转换与实验室级修复功能。
+**BD Toolbox** 是一款基于 Python 和 CustomTkinter 开发的现代视频/音频处理平台。它旨在通过直观的 GUI 界面简化复杂的 FFmpeg 命令行操作，提供专业级的压制、转换与修复功能。
 
 ---
 
@@ -34,7 +34,7 @@
 
 ## 📥 软件下载
 
-如果您不想配置 Python 环境，可以直接前往 **[GitHub Releases](https://github.com//releases)** 下载打包好的压缩包。
+如果您不想配置 Python 环境，可以直接前往 **[GitHub Releases]([https://github.com//releases](https://github.com/bidouBD/BD_Toolbox/releases))** 下载打包好的压缩包。
 - **绿色版**：解压即用，无需安装。
 - **全集成**：内置所有环境依赖及 FFmpeg 核心。
 
