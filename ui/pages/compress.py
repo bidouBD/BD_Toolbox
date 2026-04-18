@@ -47,6 +47,7 @@ class CompressPage(ctk.CTkFrame):
         self.grid_rowconfigure(5, weight=1)
         self._runner = None
         self._input_path = None
+        self._input_paths = []
         self._video_info = None
         self._build()
 
@@ -68,7 +69,7 @@ class CompressPage(ctk.CTkFrame):
         c1.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 10))
         c1.grid_columnconfigure(0, weight=1)
 
-        self._file_sel = FileSelector(c1, label="选择压缩源文件", on_change=self._on_file_selected)
+        self._file_sel = FileSelector(c1, label="选择压缩源文件", multiple=True, on_change=self._on_file_selected)
         self._file_sel.grid(row=0, column=0, sticky="ew", padx=16, pady=16)
 
         self._info_lbl = ctk.CTkLabel(c1, text="", font=small_font(), text_color=["#9CA3AF", "#6B7280"])
@@ -170,14 +171,24 @@ class CompressPage(ctk.CTkFrame):
             self._2pass.configure(state="normal")
             self._update_estimation(self._br_slider.get())
 
-    def _on_file_selected(self, path):
-        self._input_path = path
-        self._video_info = get_video_info(path)
+    def _on_file_selected(self, paths):
+        if not paths:
+            self._input_paths = []
+            self._input_path = None
+            self._info_lbl.configure(text="")
+            return
+        if isinstance(paths, str): paths = [paths]
+        self._input_paths = paths
+        self._input_path = paths[0]
+        self._video_info = get_video_info(self._input_path)
         if self._video_info:
-            size_str = human_size(path)
+            size_str = human_size(self._input_path)
             br = self._video_info.get('bitrate', 0)
             br_mbps = (br / 1000000) if br else 0
-            self._info_lbl.configure(text=f"📄 {Path(path).name}  ·  原体积: {size_str}  ·  估计码率: {br_mbps:.2f} Mbps")
+            if len(paths) > 1:
+                self._info_lbl.configure(text=f"📁 已选择 {len(paths)} 个文件 (首个: {Path(self._input_path).name})")
+            else:
+                self._info_lbl.configure(text=f"📄 {Path(self._input_path).name}  ·  原体积: {size_str}  ·  估计码率: {br_mbps:.2f} Mbps")
             self._update_estimation(self._br_slider.get())
 
     def _update_estimation(self, br_kbps):
@@ -193,18 +204,28 @@ class CompressPage(ctk.CTkFrame):
     def _on_action(self):
         if self._runner and self._runner.running:
             self._runner.stop(); self._action_btn.set_running(False); return
-        if not self._input_path:
+        if not hasattr(self, '_input_paths') or not self._input_paths:
             messagebox.showwarning("提示", "请先选择源文件"); return
 
-        cmds = self._build_commands()
-        if not cmds: return
+        all_cmds = []
+        total_duration = 0
+        for p in self._input_paths:
+            self._input_path = p
+            self._video_info = get_video_info(p)
+            if self._video_info:
+                total_duration += self._video_info.get('duration', 0)
+            cmds = self._build_commands()
+            if cmds:
+                all_cmds.extend(cmds)
+
+        if not all_cmds: return
         
         self._log.clear(); self._progress.reset(); self._action_btn.set_running(True)
         self._runner = FFmpegRunner(
             log_callback=self._log.append, progress_callback=self._progress.set, done_callback=self._on_done
         )
-        if self._video_info: self._runner.set_duration(self._video_info['duration'])
-        self._runner.run(cmds)
+        if total_duration > 0: self._runner.set_duration(total_duration)
+        self._runner.run(all_cmds)
 
     def _build_commands(self):
         inp = self._input_path
