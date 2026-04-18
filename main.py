@@ -28,6 +28,7 @@ class App(ctk.CTk):
         self.title("BD Toolbox")
         self.geometry("1280x800")
         self.minsize(1100, 600)
+        self.iconbitmap(str(Path(__file__).parent / "vvrmb-7zas8-001.ico"))
 
         # Initial appearance
         self._is_dark = False
