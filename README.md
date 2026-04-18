@@ -34,7 +34,7 @@
 
 ## 📥 软件下载
 
-如果您不想配置 Python 环境，可以直接前往 **[GitHub Releases](https://github.com//releases](https://github.com/bidouBD/BD_Toolbox/releases)** 下载打包好的压缩包。
+如果您不想配置 Python 环境，可以直接前往 **[GitHub Releases](https://github.com/bidouBD/BD_Toolbox/releases)** 下载打包好的压缩包。
 - **绿色版**：解压即用，无需安装。
 - **全集成**：内置所有环境依赖及 FFmpeg 核心。
 
