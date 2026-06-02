@@ -1,0 +1,52 @@
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build / distribution
+build/
+dist/
+*.egg-info/
+*.eggs/
+*.whl
+*.pyz
+*.spec
+!build.spec
+!main.spec
+*.toc
+*.log
+*.cutree
+ffmpeg2pass-*.log*
+warn-*.txt
+xref-*.html
+localpycs/
+
+# PyInstaller / executables
+bin/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# IDEs and editors
+.vscode/
+.idea/
+
+# Environment and secrets
+.env
+.env.*
+secrets.json
+
+# Databases
+*.sqlite3
+*.db
+
+# Misc
+coverage.xml
+.coverage
+htmlcov/

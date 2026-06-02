@@ -1,105 +1,148 @@
-"""
-FFmpeg Studio — Main Entry Point
-"""
-
-import customtkinter as ctk
 import sys
 import os
 from pathlib import Path
+from PyQt6.QtGui import QIcon
 
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).parent))
+# Must be before any Qt imports
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication
+try:
+    QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+except: pass
 
-from ui.theme import apply_mode, COLORS
-from ui.sidebar import Sidebar
-from ui.pages.convert import ConvertPage
-from ui.pages.compress import CompressPage
-from ui.pages.audio import AudioPage
-from ui.pages.cut import CutPage
-from ui.pages.merge import MergePage
-from ui.pages.gif import GifPage
-from ui.pages.subtitle import SubtitlesPage
-from ui.pages.lab import LabPage
+sys.path.insert(0, str(Path(__file__).parent))
 
-class App(ctk.CTk):
-    def __init__(self):
-        super().__init__()
 
-        self.title("BD Toolbox")
-        self.geometry("1280x800")
-        self.minsize(1100, 600)
-        
-        # Robust icon loading
-        try:
-            from core.ffmpeg_runner import get_resource_path
-            icon_path = get_resource_path("bd_toolbox.ico")
-            if os.path.exists(icon_path):
-                self.iconbitmap(icon_path)
-        except Exception:
-            pass
+class BDToolbox:
+    """Wrapper to delay importing qfluentwidgets and pages until QApplication exists."""
 
-        # Initial appearance
-        self._is_dark = False
-        apply_mode("light")
-        self.configure(fg_color=["#F2F4F8", "#1F2937"])
-
-        # Layout
-        self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(0, weight=1)
-
-        # ── Sidebar ────────────────────────────────────────────────────────
-        self.sidebar = Sidebar(
-            self,
-            navigate_cb=self._show_page,
-            toggle_theme_cb=self._toggle_theme
+    @staticmethod
+    def create():
+        from qfluentwidgets import (
+            FluentWindow, NavigationItemPosition, FluentIcon,
+            setTheme, Theme, isDarkTheme,
         )
-        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        from ui.pages.convert import ConvertPage
+        from ui.pages.compress import CompressPage
+        from ui.pages.audio import AudioPage
+        from ui.pages.cut import CutPage
+        from ui.pages.merge import MergePage
+        from ui.pages.gif import GifPage
+        from ui.pages.subtitle import SubtitlesPage
+        from ui.pages.lab import LabPage
 
-        # ── Content Container ──────────────────────────────────────────────
-        self.container = ctk.CTkFrame(self, fg_color="transparent")
-        self.container.grid(row=0, column=1, sticky="nsew")
-        self.container.grid_columnconfigure(0, weight=1)
-        self.container.grid_rowconfigure(0, weight=1)
+        class MainWindow(FluentWindow):
+            def __init__(self):
+                super().__init__()
+                self.setWindowTitle("BD Toolbox")
+                self.resize(1280, 800)
+                self.setMinimumSize(1100, 780)
 
-        # ── Pages ──────────────────────────────────────────────────────────
-        self.pages = {
-            "convert":  ConvertPage(self.container),
-            "compress": CompressPage(self.container),
-            "audio":    AudioPage(self.container),
-            "cut":      CutPage(self.container),
-            "merge":    MergePage(self.container),
-            "gif":      GifPage(self.container),
-            "subtitle": SubtitlesPage(self.container),
-            "lab":      LabPage(self.container),
-        }
+                try:
+                    self.windowEffect.removeBackgroundEffect(self.winId())
+                except Exception:
+                    pass
 
-        for page in self.pages.values():
-            page.grid(row=0, column=0, sticky="nsew")
+                # App icon
+                try:
+                    from core.ffmpeg_runner import get_resource_path
+                    icon_path = get_resource_path("bd_toolbox.ico")
+                    if os.path.exists(icon_path):
+                        self.setWindowIcon(QIcon(icon_path))
+                except Exception:
+                    pass
 
-        # Start with default page
-        self._show_page("convert")
+                setTheme(Theme.LIGHT)
+                self.navigationInterface.setExpandWidth(160)
 
-    def _show_page(self, key):
-        """Bring selected page to front."""
-        for k, page in self.pages.items():
-            if k == key:
-                page.grid(row=0, column=0, sticky="nsew")
-            else:
-                page.grid_forget()
+                self._setup_navigation()
 
-        self.sidebar.set_active(key)
+            # ── Navigation ────────────────────────────────────────────────────────
 
-    def _toggle_theme(self):
-        self._is_dark = not self._is_dark
-        mode = "dark" if self._is_dark else "light"
-        apply_mode(mode)
-        # Force update of colors if needed (CustomTkinter usually handles this well automatically)
+            def _setup_navigation(self):
+                """Add all nav items. Called once from __init__."""
+                from qfluentwidgets import NavigationItemPosition, FluentIcon
+                from ui.pages.convert import ConvertPage
+                from ui.pages.compress import CompressPage
+                from ui.pages.audio import AudioPage
+                from ui.pages.cut import CutPage
+                from ui.pages.merge import MergePage
+                from ui.pages.gif import GifPage
+                from ui.pages.subtitle import SubtitlesPage
+                from ui.pages.lab import LabPage
+
+                # Group: Core Tools
+                self.navigationInterface.addSeparator(NavigationItemPosition.SCROLL)
+                self.addSubInterface(ConvertPage(self),  FluentIcon.VIDEO,    "视频转换")
+                self.addSubInterface(CompressPage(self), FluentIcon.ZOOM,     "视频压缩")
+                self.addSubInterface(AudioPage(self),    FluentIcon.MUSIC,    "音频提取")
+                self.addSubInterface(CutPage(self),      FluentIcon.EDIT,     "视频裁切")
+
+                # Group: Extended Features
+                self.navigationInterface.addSeparator(NavigationItemPosition.SCROLL)
+                self.addSubInterface(MergePage(self),    FluentIcon.LIBRARY,  "视频合并",
+                                     position=NavigationItemPosition.SCROLL)
+                self.addSubInterface(GifPage(self),      FluentIcon.PHOTO,    "导出 GIF",
+                                     position=NavigationItemPosition.SCROLL)
+                self.addSubInterface(SubtitlesPage(self),FluentIcon.DOCUMENT, "烧录字幕",
+                                     position=NavigationItemPosition.SCROLL)
+
+                # Group: Utilities
+                self.navigationInterface.addSeparator(NavigationItemPosition.SCROLL)
+                self.addSubInterface(LabPage(self),      FluentIcon.BROOM,    "视频实验室",
+                                     position=NavigationItemPosition.SCROLL)
+
+                # Bottom: theme toggle
+                self.navigationInterface.addItem(
+                    routeKey="theme_toggle",
+                    icon=FluentIcon.CONSTRACT,
+                    text="深色模式",
+                    onClick=self._toggle_theme,
+                    position=NavigationItemPosition.BOTTOM,
+                )
+
+
+            # ── Theme toggle ──────────────────────────────────────────────────────
+
+            def _toggle_theme(self):
+                from qfluentwidgets import setTheme, Theme, isDarkTheme
+                if isDarkTheme():
+                    setTheme(Theme.LIGHT)
+                    # FIX: was `setText` with no argument (silent bug — setText is a method,
+                    # not a call; the label never updated when switching back to light mode)
+                    self.navigationInterface.widget("theme_toggle").setText("深色模式")
+                else:
+                    setTheme(Theme.DARK)
+                    self.navigationInterface.widget("theme_toggle").setText("浅色模式")
+
+                # ── Do NOT call unpolish/polish on the whole window here ──────────
+                # qfluentwidgets already repaints every managed widget when setTheme()
+                # fires its internal themeChanged signal. Cascading unpolish/polish
+                # from the top-level window causes all children to recalculate their
+                # sizeHint(), which is the root cause of the one-time layout shift.
+                # FlatComboBox instances self-refresh via qconfig.themeChanged.
+
+        return MainWindow()
+
+
+def main():
+    app = QApplication(sys.argv)
+
+    from qfluentwidgets import setTheme, Theme, setThemeColor
+    setThemeColor("#00B894")
+    setTheme(Theme.LIGHT)
+
+    app.setStyleSheet("""
+        CaptionLabel#VideoInfoLabel { color: #8C8C8C; }
+        PrimaryPushButton { padding: 0 20px; }
+    """)
+
+    window = BDToolbox.create()
+    window.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+    window.show()
+
+    sys.exit(app.exec())
+
 
 if __name__ == "__main__":
-    # Ensure bin directory exists for FFmpeg
-    bin_path = Path(__file__).parent / "bin"
-    if not bin_path.exists():
-        bin_path.mkdir(parents=True, exist_ok=True)
-
-    app = App()
-    app.mainloop()
+    main()

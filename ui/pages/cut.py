@@ -1,205 +1,215 @@
 """
-Page 3: 视频裁切
-Trim video by start/end time. Fast mode (stream copy) or precise mode (re-encode).
+Page: 视频裁切
+PyQt6 + qfluentwidgets rewrite — logic identical to original.
 """
 
-import customtkinter as ctk
-from tkinter import messagebox
 from pathlib import Path
+
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QFont
+
+from qfluentwidgets import (
+    SubtitleLabel, CaptionLabel, BodyLabel, LineEdit,
+    PushButton, InfoBar, InfoBarPosition,
+)
 
 from core.ffmpeg_runner import FFmpegRunner
 from core.utils import get_video_info, generate_output_path, human_size, format_time, parse_time
 from ui.widgets import (
     SectionCard, FileSelector, OutputDirSelector,
-    LogBox, ProgressRow, LabeledOption, LabeledEntry, ActionButton,
+    LogBox, ProgressRow, LabeledOption, ActionButton,
 )
-from ui.theme import body_font, small_font, heading_font
+from ui.theme import body_font, small_font, mono_font
 
 
-CUT_MODES = ["快速模式（流复制，速度快，可能有误差）", "精确模式（重新编码，精确到帧）"]
+CUT_MODES = [
+    "快速模式（流复制，速度快，可能有误差）",
+    "精确模式（重新编码，精确到帧）",
+]
 
 
-class CutPage(ctk.CTkFrame):
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, fg_color=["#F2F4F8", "#1F2937"], corner_radius=0, **kwargs)
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(4, weight=1)
+class CutPage(QWidget):
+    run_done_signal = pyqtSignal(bool)
 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("CutPage")
+        self.run_done_signal.connect(self._handle_run_done)
         self._runner = None
         self._input_path = None
         self._duration = None
         self._build()
 
     def _build(self):
-        pad = {"padx": 24, "pady": 0}
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 0, 24, 20)
+        root.setSpacing(10)
 
-        # Title
-        title_frame = ctk.CTkFrame(self, fg_color="transparent", height=64)
-        title_frame.grid(row=0, column=0, sticky="ew", **pad)
-        title_frame.grid_propagate(False)
-        ctk.CTkLabel(
-            title_frame,
-            text="🕒视频裁切",
-            font=ctk.CTkFont(family="Microsoft YaHei UI", size=18, weight="bold"),
-            text_color=["#111827", "#F9FAFB"],
-            anchor="w",
-        ).place(relx=0, rely=0.5, anchor="w")
+        title = SubtitleLabel("🕒 视频裁切", self)
+        title.setFont(QFont("Microsoft YaHei UI", 16, QFont.Weight.Bold))
+        root.addSpacing(12)
+        root.addWidget(title)
 
-        # ── Card 1: File ──────────────────────────────────────────
+        # Card 1: File
         c1 = SectionCard(self)
-        c1.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 10))
-        c1.grid_columnconfigure(0, weight=1)
+        c1_lay = QVBoxLayout()
+        c1_lay.setContentsMargins(10, 10, 10, 10)
+        c1_lay.setSpacing(6)
 
         self._file_sel = FileSelector(
-            c1,
-            label="选择视频文件",
+            c1, label="选择视频文件",
             filetypes=[
                 ("视频文件", "*.mp4 *.mkv *.avi *.mov *.flv *.webm *.wmv *.ts *.m4v"),
                 ("所有文件", "*.*"),
             ],
             on_change=self._on_file_selected,
         )
-        self._file_sel.grid(row=0, column=0, sticky="ew", padx=16, pady=14)
+        c1_lay.addWidget(self._file_sel)
 
-        self._file_info = ctk.CTkLabel(
-            c1, text="", font=small_font(),
-            text_color=["#9CA3AF", "#6B7280"], anchor="w"
-        )
-        self._file_info.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 10))
+        self._file_info = CaptionLabel("", c1)
+        self._file_info.setFont(small_font())
+        c1_lay.addWidget(self._file_info)
+        c1.layout().addLayout(c1_lay)
+        root.addWidget(c1)
 
-        # ── Card 2: Time options ──────────────────────────────────
+        # Card 2: Time options
         c2 = SectionCard(self)
-        c2.grid(row=2, column=0, sticky="ew", padx=24, pady=(0, 10))
-        c2.grid_columnconfigure(3, weight=1)
+        c2_lay = QVBoxLayout()
+        c2_lay.setContentsMargins(16, 14, 16, 14)
+        c2_lay.setSpacing(10)
 
-        # Start time
-        ctk.CTkLabel(
-            c2, text="开始时间:", font=body_font(),
-            text_color=["#374151", "#D1D5DB"], anchor="w"
-        ).grid(row=0, column=0, padx=(16, 6), pady=14, sticky="w")
+        # Start / End time row
+        time_row = QHBoxLayout()
+        time_row.setSpacing(16)
 
-        self._start_entry = ctk.CTkEntry(
-            c2, placeholder_text="00:00:00", width=120, height=36, corner_radius=8,
-            font=ctk.CTkFont(family="Consolas", size=13),
-            fg_color=["#FFFFFF", "#1F2937"],
-            border_color=["#D1D5DB", "#4B5563"],
-            text_color=["#111827", "#F3F4F6"],
-        )
-        self._start_entry.grid(row=0, column=1, padx=(0, 20), pady=14)
+        start_lbl = BodyLabel("开始时间:", c2)
+        start_lbl.setFont(body_font())
+        time_row.addWidget(start_lbl)
 
-        # End time
-        ctk.CTkLabel(
-            c2, text="结束时间:", font=body_font(),
-            text_color=["#374151", "#D1D5DB"], anchor="w"
-        ).grid(row=0, column=2, padx=(0, 6), pady=14, sticky="w")
+        self._start_entry = LineEdit(c2)
+        self._start_entry.setPlaceholderText("00:00:00")
+        self._start_entry.setFixedSize(120, 36)
+        self._start_entry.setFont(mono_font())
+        time_row.addWidget(self._start_entry)
 
-        self._end_entry = ctk.CTkEntry(
-            c2, placeholder_text="00:00:00", width=120, height=36, corner_radius=8,
-            font=ctk.CTkFont(family="Consolas", size=13),
-            fg_color=["#FFFFFF", "#1F2937"],
-            border_color=["#D1D5DB", "#4B5563"],
-            text_color=["#111827", "#F3F4F6"],
-        )
-        self._end_entry.grid(row=0, column=3, padx=(0, 16), pady=14, sticky="w")
+        time_row.addSpacing(20)
 
-        # Duration hint + fill button
-        self._dur_hint = ctk.CTkLabel(
-            c2, text="ℹ 选择文件后显示时长", font=small_font(),
-            text_color=["#9CA3AF", "#6B7280"], anchor="w"
-        )
-        self._dur_hint.grid(row=1, column=0, columnspan=2, padx=16, pady=(0, 14), sticky="w")
+        end_lbl = BodyLabel("结束时间:", c2)
+        end_lbl.setFont(body_font())
+        time_row.addWidget(end_lbl)
 
-        self._fill_end_btn = ctk.CTkButton(
-            c2,
-            text="填入视频总时长",
-            width=130, height=30,
-            corner_radius=6,
-            font=small_font(),
-            fg_color=["#E5E7EB", "#374151"],
-            hover_color=["#D1D5DB", "#4B5563"],
-            text_color=["#374151", "#D1D5DB"],
-            command=self._fill_end,
-        )
-        self._fill_end_btn.grid(row=1, column=2, padx=0, pady=(0, 12), sticky="w")
+        self._end_entry = LineEdit(c2)
+        self._end_entry.setPlaceholderText("00:00:00")
+        self._end_entry.setFixedSize(120, 36)
+        self._end_entry.setFont(mono_font())
+        time_row.addWidget(self._end_entry)
+        time_row.addStretch()
+        c2_lay.addLayout(time_row)
+
+        # Hint + fill button row
+        hint_row = QHBoxLayout()
+        hint_row.setSpacing(16)
+
+        self._dur_hint = CaptionLabel("ℹ 选择文件后显示时长", c2)
+        self._dur_hint.setFont(small_font())
+        hint_row.addWidget(self._dur_hint)
+
+        self._fill_end_btn = PushButton("填入视频总时长", c2)
+        self._fill_end_btn.setFixedSize(130, 30)
+        self._fill_end_btn.setFont(small_font())
+        self._fill_end_btn.clicked.connect(self._fill_end)
+        hint_row.addWidget(self._fill_end_btn)
+        hint_row.addStretch()
+        c2_lay.addLayout(hint_row)
 
         # Mode
         self._mode = LabeledOption(
             c2, "裁切模式:", CUT_MODES,
-            default="快速模式（流复制，速度快，可能有误差）", width=360
+            default="快速模式（流复制，速度快，可能有误差）", width=360,
         )
-        self._mode.grid(row=2, column=0, columnspan=4, padx=16, pady=(0, 14), sticky="w")
+        c2_lay.addWidget(self._mode)
 
-        # ── Card 3: Output + action ───────────────────────────────
+        c2.layout().addLayout(c2_lay)
+        root.addWidget(c2)
+
+        # Card 3: Output + action
         c3 = SectionCard(self)
-        c3.grid(row=3, column=0, sticky="ew", padx=24, pady=(0, 10))
-        c3.grid_columnconfigure(0, weight=1)
+        c3_lay = QVBoxLayout()
+        c3_lay.setContentsMargins(16, 14, 16, 14)
+        c3_lay.setSpacing(8)
 
         self._out_dir = OutputDirSelector(c3)
-        self._out_dir.grid(row=0, column=0, sticky="ew", padx=16, pady=14)
+        c3_lay.addWidget(self._out_dir)
 
         self._progress = ProgressRow(c3)
-        self._progress.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 10))
+        c3_lay.addWidget(self._progress)
 
-        self._action_btn = ActionButton(c3, start_text="⚡  开始裁切", command=self._on_action)
-        self._action_btn.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 14))
+        self._action_btn = ActionButton(c3, start_text="⚡  开始裁切")
+        self._action_btn.clicked.connect(self._on_action)
+        c3_lay.addWidget(self._action_btn)
 
-        # ── Log ───────────────────────────────────────────────────
+        c3.layout().addLayout(c3_lay)
+        root.addWidget(c3)
+
         self._log = LogBox(self)
-        self._log.grid(row=4, column=0, sticky="nsew", padx=24, pady=(0, 20))
+        root.addWidget(self._log, 1)
 
-    def _on_file_selected(self, path):
+    def _on_file_selected(self, path: str):
         self._input_path = path
         size = human_size(path)
         info = get_video_info(path)
         if info:
-            dur = info['duration']
+            dur = info["duration"]
             self._duration = dur
             h = int(dur // 3600); m = int((dur % 3600) // 60); s = int(dur % 60)
             dur_str = f"{h:02d}:{m:02d}:{s:02d}"
-            self._dur_hint.configure(
-                text=f"⏱ 视频总时长: {dur_str}",
-                text_color=["#059669", "#34D399"],
-            )
-            self._file_info.configure(
-                text=f"📄 {Path(path).name}  ·  {size}  ·  时长 {dur_str}"
+            self._dur_hint.setText(f"⏱ 视频总时长: {dur_str}")
+            self._dur_hint.setStyleSheet("color: #059669;")
+            self._file_info.setText(
+                f"📄 {Path(path).name}  ·  {size}  ·  时长 {dur_str}"
             )
         else:
-            self._dur_hint.configure(
-                text="ℹ 无法读取时长，请手动输入",
-                text_color=["#9CA3AF", "#6B7280"],
-            )
-            self._file_info.configure(text=f"📄 {Path(path).name}  ·  {size}")
+            self._dur_hint.setText("ℹ 无法读取时长，请手动输入")
+            self._dur_hint.setStyleSheet("")
+            self._file_info.setText(f"📄 {Path(path).name}  ·  {size}")
 
     def _fill_end(self):
         if self._duration:
-            self._end_entry.delete(0, "end")
-            self._end_entry.insert(0, format_time(self._duration))
+            self._end_entry.setText(format_time(self._duration))
 
     def _on_action(self):
         if self._runner and self._runner.running:
             self._runner.stop()
             self._action_btn.set_running(False)
             return
-
         if not self._input_path:
-            messagebox.showwarning("提示", "请先选择视频文件！")
+            InfoBar.warning("提示", "请先选择视频文件！",
+                            duration=3000, parent=self,
+                            position=InfoBarPosition.TOP)
             return
 
-        start_str = self._start_entry.get().strip() or "00:00:00"
-        end_str   = self._end_entry.get().strip()
+        start_str = self._start_entry.text().strip() or "00:00:00"
+        end_str = self._end_entry.text().strip()
         if not end_str:
-            messagebox.showwarning("提示", "请输入结束时间！")
+            InfoBar.warning("提示", "请输入结束时间！",
+                            duration=3000, parent=self,
+                            position=InfoBarPosition.TOP)
             return
 
         try:
             start_sec = parse_time(start_str)
-            end_sec   = parse_time(end_str)
+            end_sec = parse_time(end_str)
         except Exception:
-            messagebox.showerror("错误", "时间格式错误，请使用 HH:MM:SS 格式")
+            InfoBar.error("错误", "时间格式错误，请使用 HH:MM:SS 格式",
+                          duration=3000, parent=self,
+                          position=InfoBarPosition.TOP)
             return
 
         if end_sec <= start_sec:
-            messagebox.showerror("错误", "结束时间必须大于开始时间！")
+            InfoBar.error("错误", "结束时间必须大于开始时间！",
+                          duration=3000, parent=self,
+                          position=InfoBarPosition.TOP)
             return
 
         cmd = self._build_command(start_str, end_str)
@@ -216,30 +226,32 @@ class CutPage(ctk.CTkFrame):
         self._runner.set_duration(clip_dur)
         self._runner.run(cmd)
 
-    def _build_command(self, start_str, end_str):
-        inp  = self._input_path
+    def _build_command(self, start_str: str, end_str: str):
+        inp = self._input_path
         mode = self._mode.get()
         fast = "快速模式" in mode
 
-        out_dir  = self._out_dir.get()
-        suffix   = "_cut"
-        ext      = Path(inp).suffix
-        out_path = generate_output_path(inp, suffix, ext)
+        out_dir = self._out_dir.get()
+        out_path = generate_output_path(inp, "_cut", Path(inp).suffix)
         if out_dir:
             out_path = str(Path(out_dir) / Path(out_path).name)
 
         if fast:
-            # Place -ss before -i for fast seek
             cmd = ["ffmpeg", "-y", "-ss", start_str, "-to", end_str,
                    "-i", inp, "-c", "copy", out_path]
         else:
-            # Precise: decode then re-encode from start
             cmd = ["ffmpeg", "-y", "-i", inp,
                    "-ss", start_str, "-to", end_str,
                    "-c:v", "libx264", "-c:a", "aac",
                    "-avoid_negative_ts", "1", out_path]
         return cmd
 
-    def _on_done(self, success):
-        self.after(0, self._action_btn.set_running, False)
-        self.after(0, self._progress.set, 1.0 if success else 0.0)
+    def _on_done(self, success: bool):
+        self.run_done_signal.emit(success)
+
+    def _handle_run_done(self, success: bool):
+        self._action_btn.set_running(False)
+        if success:
+            self._progress.set(1.0)
+        else:
+            self._log.append("\n❌ 处理被中断或发生错误！")
