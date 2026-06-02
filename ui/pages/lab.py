@@ -1,116 +1,146 @@
 """
 Page: 视频实验室 (Video Lab)
-Collection of experimental and automated video processing tools.
-Includes: auto crop detector, volume normalization, auto rotation fix, silence detection.
+PyQt6 + qfluentwidgets rewrite — logic identical to original.
 """
 
-import customtkinter as ctk
-from tkinter import messagebox
-from pathlib import Path
 import re
 import subprocess
+import threading
+from pathlib import Path
+
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QFont
+
+from qfluentwidgets import (
+    SubtitleLabel, CaptionLabel, PushButton,
+    InfoBar, InfoBarPosition,
+)
 
 from core.ffmpeg_runner import FFmpegRunner, get_ffmpeg_path
-from core.utils import get_video_info, generate_output_path, human_size
+from core.utils import get_video_info, generate_output_path
 from ui.widgets import (
     SectionCard, FileSelector, OutputDirSelector,
     LogBox, ProgressRow, ActionButton,
 )
-from ui.theme import body_font, heading_font, small_font
+from ui.theme import small_font
+
 
 LAB_TOOLS = [
-    ("cropdetect",  "✂️", "自动黑边裁切", "自动检测视频黑边并移除（如电影画幅转全屏）"),
-    ("volumenorm", "🔊", "音量标准化", "一键平衡视频音量，解决声音忽大忽小的问题"),
-    ("autorotate", "🔄", "画面旋转修复", "物理级旋转像素，纠正倒置或侧翻的视频画面"),
-    ("silencecut", "🔇", "静音智能剪辑", "自动识别并切除无声片段，提升视频紧凑度（Vlog神器）"),
+    ("cropdetect",  "✂️", "自动黑边裁切",  "自动检测视频黑边并移除（如电影画幅转全屏）"),
+    ("volumenorm",  "🔊", "音量标准化",    "一键平衡视频音量，解决声音忽大忽小的问题"),
+    ("autorotate",  "🔄", "画面旋转修复",  "物理级旋转像素，纠正倒置或侧翻的视频画面"),
+    ("silencecut",  "🔇", "静音智能剪辑",  "自动识别并切除无声片段，提升视频紧凑度（Vlog神器）"),
 ]
 
-class LabPage(ctk.CTkFrame):
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, fg_color=["#F2F4F8", "#1F2937"], corner_radius=0, **kwargs)
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(5, weight=1)
+_STYLE_TOOL_NORMAL = (
+    "PushButton {"
+    "  background: transparent;"
+    "  border: 1px solid #D1D5DB;"
+    "  border-radius: 10px;"
+    "  color: #374151;"
+    "}"
+    "PushButton:hover { background: #E5E7EB; }"
+)
+_STYLE_TOOL_ACTIVE = (
+    "PushButton {"
+    "  background-color: #D6F5EE;"
+    "  border: none;"
+    "  border-radius: 10px;"
+    "  color: #007A64;"
+    "  font-weight: bold;"
+    "}"
+)
+
+
+class LabPage(QWidget):
+    run_done_signal = pyqtSignal(bool)
+    crop_done_signal = pyqtSignal(object)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("LabPage")
+        self.run_done_signal.connect(self._handle_run_done)
+        self.crop_done_signal.connect(self._apply_crop)
         self._runner = None
         self._input_path = None
         self._current_tool = "cropdetect"
         self._build()
 
     def _build(self):
-        pad = {"padx": 24, "pady": 0}
+        root = QVBoxLayout(self)
+        root.setContentsMargins(30, 0, 30, 30)
+        root.setSpacing(12)
 
-        # Title
-        title_frame = ctk.CTkFrame(self, fg_color="transparent", height=64)
-        title_frame.grid(row=0, column=0, sticky="ew", **pad)
-        title_frame.grid_propagate(False)
-        ctk.CTkLabel(
-            title_frame, text="🧪 视频实验室",
-            font=ctk.CTkFont(family="Microsoft YaHei UI", size=18, weight="bold"),
-            text_color=["#111827", "#F9FAFB"], anchor="w",
-        ).place(relx=0, rely=0.5, anchor="w")
+        title = SubtitleLabel("🧪 视频实验室", self)
+        title.setFont(QFont("Microsoft YaHei UI", 16, QFont.Weight.Bold))
+        root.addSpacing(20)
+        root.addWidget(title)
 
-        # ── Card 1: Tool Selection ────────────────────────────────
+        # Card 1: Tool selection
         c1 = SectionCard(self)
-        c1.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 10))
-        c1.grid_columnconfigure(0, weight=1)
+        c1_lay = QVBoxLayout()
+        c1_lay.setContentsMargins(16, 14, 16, 12)
+        c1_lay.setSpacing(10)
 
-        tool_frame = ctk.CTkFrame(c1, fg_color="transparent")
-        tool_frame.grid(row=0, column=0, sticky="ew", padx=16, pady=14)
-        
-        self.tool_btns = {}
-        for i, (key, icon, name, desc) in enumerate(LAB_TOOLS):
-            btn = ctk.CTkButton(
-                tool_frame, text=f"{icon} {name}", 
-                width=170, height=44, corner_radius=10,
-                fg_color="transparent", border_width=1,
-                border_color=["#D1D5DB", "#374151"],
-                text_color=["#374151", "#D1D5DB"],
-                hover_color=["#E5E7EB", "#2D3748"],
-                command=lambda k=key: self._select_tool(k)
-            )
-            btn.grid(row=0, column=i, padx=8)
+        tool_row = QHBoxLayout()
+        tool_row.setSpacing(12)
+        self.tool_btns: dict[str, PushButton] = {}
+        for key, icon, name, desc in LAB_TOOLS:
+            btn = PushButton(f"{icon} {name}", c1)
+            btn.setFixedSize(170, 44)
+            btn.setFont(QFont("Microsoft YaHei UI", 12))
+            btn.setStyleSheet(_STYLE_TOOL_NORMAL)
+            btn.clicked.connect(lambda checked=False, k=key: self._select_tool(k))
+            tool_row.addWidget(btn)
             self.tool_btns[key] = btn
-        
-        self._tool_desc = ctk.CTkLabel(
-            c1, text=LAB_TOOLS[0][3], font=small_font(),
-            text_color=["#6B7280", "#9CA3AF"], anchor="w"
-        )
-        self._tool_desc.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 12))
+        tool_row.addStretch()
+        c1_lay.addLayout(tool_row)
+
+        self._tool_desc = CaptionLabel(LAB_TOOLS[0][3], c1)
+        self._tool_desc.setFont(small_font())
+        c1_lay.addWidget(self._tool_desc)
+
+        c1.layout().addLayout(c1_lay)
+        root.addWidget(c1)
         self._select_tool("cropdetect")
 
-        # ── Card 2: File & Action ─────────────────────────────────
+        # Card 2: File + action
         c2 = SectionCard(self)
-        c2.grid(row=2, column=0, sticky="ew", padx=24, pady=(0, 10))
-        c2.grid_columnconfigure(0, weight=1)
+        c2_lay = QVBoxLayout()
+        c2_lay.setContentsMargins(16, 14, 16, 14)
+        c2_lay.setSpacing(8)
 
-        self._file_sel = FileSelector(c2, label="选择处理文件", on_change=self._on_file_selected)
-        self._file_sel.grid(row=0, column=0, sticky="ew", padx=16, pady=16)
+        self._file_sel = FileSelector(
+            c2, label="选择处理文件", on_change=self._on_file_selected
+        )
+        c2_lay.addWidget(self._file_sel)
 
         self._out_dir = OutputDirSelector(c2)
-        self._out_dir.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
+        c2_lay.addWidget(self._out_dir)
 
         self._progress = ProgressRow(c2)
-        self._progress.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 12))
+        c2_lay.addWidget(self._progress)
 
-        self._action_btn = ActionButton(c2, start_text="⚡  一键实验室处理", command=self._on_action)
-        self._action_btn.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 16))
+        self._action_btn = ActionButton(c2, start_text="⚡  一键实验室处理")
+        self._action_btn.clicked.connect(self._on_action)
+        c2_lay.addWidget(self._action_btn)
 
-        # ── Logbox ────────────────────────────────────────────────
+        c2.layout().addLayout(c2_lay)
+        root.addWidget(c2)
+
         self._log = LogBox(self)
-        self._log.grid(row=5, column=0, sticky="nsew", padx=24, pady=(0, 20))
+        root.addWidget(self._log, 1)
 
-    def _select_tool(self, key):
+    def _select_tool(self, key: str):
         self._current_tool = key
         for k, btn in self.tool_btns.items():
+            btn.setStyleSheet(_STYLE_TOOL_ACTIVE if k == key else _STYLE_TOOL_NORMAL)
+        for k, _, _, d in LAB_TOOLS:
             if k == key:
-                btn.configure(fg_color=["#D6F5EE", "#064E3B"], border_width=0, text_color=["#007A64", "#34D399"])
-            else:
-                btn.configure(fg_color="transparent", border_width=1, text_color=["#374151", "#D1D5DB"])
-        
-        for k, i, n, d in LAB_TOOLS:
-            if k == key:
-                self._tool_desc.configure(text=d)
+                self._tool_desc.setText(d)
 
-    def _on_file_selected(self, path):
+    def _on_file_selected(self, path: str):
         self._input_path = path
 
     def _on_action(self):
@@ -118,9 +148,10 @@ class LabPage(ctk.CTkFrame):
             self._runner.stop()
             self._action_btn.set_running(False)
             return
-
         if not self._input_path:
-            messagebox.showwarning("提示", "请先选择视频文件")
+            InfoBar.warning("提示", "请先选择视频文件",
+                            duration=3000, parent=self,
+                            position=InfoBarPosition.TOP)
             return
 
         self._log.clear()
@@ -133,61 +164,83 @@ class LabPage(ctk.CTkFrame):
             cmd = self._build_tool_command()
             info = get_video_info(self._input_path)
             self._runner = FFmpegRunner(
-                log_callback=self._log.append, progress_callback=self._progress.set, done_callback=self._on_done
+                log_callback=self._log.append,
+                progress_callback=self._progress.set,
+                done_callback=self._on_done,
             )
-            if info: self._runner.set_duration(info['duration'])
+            if info:
+                self._runner.set_duration(info["duration"])
             self._runner.run(cmd)
 
     def _build_tool_command(self):
         inp = self._input_path
         out_dir = self._out_dir.get()
-        suffix = f"_{self._current_tool}"
-        out_path = generate_output_path(inp, suffix, Path(inp).suffix)
-        if out_dir: out_path = str(Path(out_dir) / Path(out_path).name)
+        out_path = generate_output_path(inp, f"_{self._current_tool}", Path(inp).suffix)
+        if out_dir:
+            out_path = str(Path(out_dir) / Path(out_path).name)
 
         if self._current_tool == "volumenorm":
             return ["ffmpeg", "-y", "-i", inp, "-af", "loudnorm", "-c:v", "copy", out_path]
         elif self._current_tool == "autorotate":
-            return ["ffmpeg", "-y", "-i", inp, "-vf", "transpose=1", "-metadata:s:v:0", "rotate=0", out_path]
+            return ["ffmpeg", "-y", "-i", inp, "-vf", "transpose=1",
+                    "-metadata:s:v:0", "rotate=0", out_path]
         elif self._current_tool == "silencecut":
-            # Just a simple silenceremove demo for now
-            return ["ffmpeg", "-y", "-i", inp, "-af", "silenceremove=stop_periods=-1:stop_duration=1:stop_threshold=-30dB", out_path]
+            return ["ffmpeg", "-y", "-i", inp,
+                    "-af", "silenceremove=stop_periods=-1:stop_duration=1:stop_threshold=-30dB",
+                    out_path]
         return None
 
     def _handle_cropdetect(self):
         self._log.append("🔍 正在检测黑边，请稍候...")
-        # Step 1: Detect
-        cmd = [get_ffmpeg_path(), "-ss", "00:00:10", "-i", self._input_path, "-vframes", "100", "-vf", "cropdetect", "-f", "null", "-"]
-        
+        cmd = [
+            get_ffmpeg_path(), "-ss", "00:00:10", "-i", self._input_path,
+            "-vframes", "100", "-vf", "cropdetect", "-f", "null", "-",
+        ]
+
         def run_detect():
-            p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, universal_newlines=True, encoding='utf-8')
+            p = subprocess.Popen(
+                cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                universal_newlines=True, encoding="utf-8",
+            )
             detected = None
             for line in p.stderr:
                 if "crop=" in line:
                     m = re.search(r"crop=([0-9:]+)", line)
-                    if m: detected = m.group(1)
+                    if m:
+                        detected = m.group(1)
             p.wait()
-            self.after(0, lambda: self._apply_crop(detected))
+            self.crop_done_signal.emit(detected)
 
-        import threading
         threading.Thread(target=run_detect, daemon=True).start()
 
-    def _apply_crop(self, crop_val):
+    def _apply_crop(self, crop_val: str | None):
         if not crop_val:
             self._log.append("❌ 未检测到明显黑边。")
             self._action_btn.set_running(False)
             return
 
         self._log.append(f"✅ 检测到裁剪区域: {crop_val}")
-        out_path = generate_output_path(self._input_path, "_cropped", Path(self._input_path).suffix)
+        out_path = generate_output_path(
+            self._input_path, "_cropped", Path(self._input_path).suffix
+        )
         if self._out_dir.get():
             out_path = str(Path(self._out_dir.get()) / Path(out_path).name)
-        
-        final_cmd = ["ffmpeg", "-y", "-i", self._input_path, "-vf", f"crop={crop_val}", out_path]
+
+        final_cmd = ["ffmpeg", "-y", "-i", self._input_path,
+                     "-vf", f"crop={crop_val}", out_path]
         self._runner = FFmpegRunner(
-            log_callback=self._log.append, progress_callback=self._progress.set, done_callback=self._on_done
+            log_callback=self._log.append,
+            progress_callback=self._progress.set,
+            done_callback=self._on_done,
         )
         self._runner.run(final_cmd)
 
-    def _on_done(self, success):
-        self.after(0, self._action_btn.set_running, False)
+    def _on_done(self, success: bool):
+        self.run_done_signal.emit(success)
+
+    def _handle_run_done(self, success: bool):
+        self._action_btn.set_running(False)
+        if success:
+            self._progress.set(1.0)
+        else:
+            self._log.append("\n❌ 处理被中断或发生错误！")
