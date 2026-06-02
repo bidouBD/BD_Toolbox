@@ -111,7 +111,7 @@ python main.py
 python build_app.py
 ```
 
-打包结果会输出到 `dist/BD_Toolbox/`。`build/`、`dist/`、虚拟环境、缓存文件、日志文件和本地 FFmpeg 二进制文件不会提交到源码仓库。
+打包结果会输出到 `dist/BD_Toolbox/`
 
 ---
 
