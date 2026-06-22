@@ -1,8 +1,6 @@
 # BD Toolbox
 
-BD Toolbox 是一款基于 Python、PyQt6 与 PyQt-Fluent-Widgets 构建的现代化 FFmpeg 图形工具箱。项目通过清晰的桌面 GUI 封装常用 FFmpeg/ffprobe 工作流，帮助用户更直观地完成视频转换、压缩、裁切、合并、音频处理、字幕处理与实验性修复任务。
-
-本次更新重点完成了 UI 框架重构：项目已由此前的 Tkinter/ttk 风格实现迁移到 PyQt6 体系，并使用 qfluentwidgets 构建更稳定、更现代的 Fluent 风格界面。
+BD Toolbox 是一款基于 Python、PyQt6 与 PyQt-Fluent-Widgets 构建的现代化 FFmpeg 图形工具箱。项目通过清晰的桌面 GUI 封装常用 FFmpeg/ffprobe 工作流，帮助用户更直观地完成视频转换、压缩、裁切、合并、音频处理、字幕处理与实验性修复任务。同时提供详细的帮助文档，包含操作指南、参数配置、FFmpeg语法结构讲解以及常见报错排查。
 
 ---
 
@@ -39,12 +37,21 @@ BD Toolbox 是一款基于 Python、PyQt6 与 PyQt-Fluent-Widgets 构建的现�
 
 ---
 
-## 本次 UI 重构更新
+## 本次更新与重构说明
 
+### 1. 新增帮助模块
+- **帮助文档页**：全面覆盖 FFmpeg 语法结构、GUI 核心参数设计原理（CRF/VBR/ABR 逻辑）、常见转换/裁剪/提取案例，以及各类常见报错的详细排查。
+
+### 2. macOS / Linux 多端运行与打包适配
+- **动态二进制检测**：程序在寻找 `ffmpeg`/`ffprobe` 时，优先读取项目本地 `bin/`；不存在时则依次扫描系统 `PATH` 环境变量与 macOS 常见安装路径（如 `/opt/homebrew/bin`、`/usr/local/bin`、`/usr/bin`）。
+- **打包配置（PyInstaller）强健化**：重构 `build.spec` 与 `build_app.py`，改为用 `sysconfig` 动态定位 Python `site-packages` 资源目录。在缺少部分资源文件或本地没有 `bin` 时不会导致直接编译失败，而是降级为警告并继续打包。
+- **应用图标 macOS 适配**：在 macOS 环境下窗口图标加载逻辑优先加载 `.icns`/`.png` 图标文件，而在未找到时再向后兼容 `.ico`。
+- **安全路径过滤与转义**：优化视频合并和字幕烧录功能中针对特殊路径字符（如中文、空格、单引号、冒号、反斜杠）的拼接和转义过滤，防止 FFmpeg 报错崩溃。
+
+### 3. UI 框架重构
 - UI 框架从 Tkinter/ttk 迁移到 PyQt6。
 - 引入 PyQt-Fluent-Widgets，重构主窗口、导航栏、页面布局和控件风格。
-- 使用 `FluentWindow` 管理侧边导航，功能页拆分为转换、压缩、音频、裁切、合并、GIF、字幕、实验室等模块。
-- 新增浅色/深色主题切换，并优化主题切换时的控件刷新和布局稳定性。
+- 使用 `FluentWindow` 管理侧边导航，功能页拆分为转换、压缩、音频、裁切、合并、GIF、字幕、实验室等模块，并增加浅色/深色主题切换。
 - 重构通用控件，包括文件选择器、输出目录选择器、日志框、进度条、参数滑块、选项下拉框和操作按钮。
 - 优化批量处理体验，转换与压缩页面支持多文件选择和顺序执行。
 - 调整打包依赖，项目依赖更新为 PyQt6、PyQt6-Fluent-Widgets、PyQt6-Frameless-Window 与 darkdetect。
@@ -144,7 +151,7 @@ macOS 打包需在 macOS 本机执行：
 python3 build_app.py
 ```
 
-打包结果会输出到 `dist/BD_Toolbox/`；macOS 下会生成 `dist/BD_Toolbox.app`。如果需要 macOS 原生图标，可在项目根目录放置 `bd_toolbox.icns`。`build/`、`dist/`、虚拟环境、缓存文件、日志文件和本地 FFmpeg 二进制文件不会提交到源码仓库。
+打包结果会输出到 `dist/BD_Toolbox/`；macOS 下会生成 `dist/BD_Toolbox.app`。如果需要 macOS 原生图标，可在项目根目录放置 `bd_toolbox.icns`。
 
 ---
 
