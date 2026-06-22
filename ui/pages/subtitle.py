@@ -101,7 +101,7 @@ class SubtitlesPage(QWidget):
             out_path = str(Path(out_dir) / Path(out_path).name)
 
         info = get_video_info(self._video_path)
-        srt_p = str(self._subtitle_path).replace("\\", "/").replace(":", "\\:")
+        srt_p = _escape_subtitle_filter_path(self._subtitle_path)
         cmd = ["ffmpeg", "-y", "-i", self._video_path,
                "-vf", f"subtitles='{srt_p}'", "-c:a", "copy", out_path]
 
@@ -126,3 +126,13 @@ class SubtitlesPage(QWidget):
             self._progress.set(1.0)
         else:
             self._log.append("\n❌ 处理被中断或发生错误！")
+
+
+def _escape_subtitle_filter_path(path) -> str:
+    """Escape paths embedded inside FFmpeg's subtitles filter argument."""
+    return (
+        str(path)
+        .replace("\\", "/")
+        .replace(":", "\\:")
+        .replace("'", "\\'")
+    )

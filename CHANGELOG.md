@@ -1,5 +1,25 @@
 # 更新日志
 
+## 2026-06-22
+
+### 新增功能
+- **帮助页上线**：新增“帮助文档”页面，全面覆盖 FFmpeg 基础语法、GUI 常用参数解释（CRF/VBR/ABR等）、常见功能处理案例以及典型报错排查指导。
+- **添加 bin 文件夹指引**：在项目中加入了 `bin/` 文件夹并附带 `请将ffmpeg与ffprobe放在此处.txt` 引导文件，指引合作开发者和用户放置对应平台的 FFmpeg 二进制文件，同时通过 `.gitignore` 规则过滤实际的二进制文件上传。
+
+### 多端适配 & 跨平台优化
+- **双端二进制路径搜索优化** (`core/ffmpeg_runner.py`, `core/utils.py`)：
+  - FFmpeg/ffprobe 在寻找可执行文件时，优先检索项目内的 `bin` 文件夹；若不存在，再依次扫描 macOS 常见安装路径 `/opt/homebrew/bin`、`/usr/local/bin`、`/usr/bin` 以及系统 `PATH` 环境变量。
+- **打包配置（PyInstaller）强健化** (`build.spec`, `build_app.py`)：
+  - 重构了 `build.spec`，使用 `sysconfig` 动态解析 Python 环境下的 `site-packages` 资源目录。
+  - 在 `build.spec` 中设定 `bin` 文件夹及 `.ico`/`.icns`/`.png` 图标文件**存在时才进行打包**，避免在缺少部分资源文件时导致打包直接失败中断。
+  - 修改 `build_app.py`，当检测到本地没有 `bin` 文件夹时**不再直接强行退出**，而是通过控制台警告提示用户（允许继续通过系统的 PATH 或自定义路径进行打包运行）。
+- **应用图标 macOS 适配** (`main.py`)：
+  - 在 macOS 系统下运行时，窗口图标加载逻辑**优先尝试寻找并加载** `bd_toolbox.icns` / `bd_toolbox.png`，在未找到时再向后兼容加载 `.ico` 图标。
+
+### 缺陷修复 & 健壮性提升
+- **路径转义安全增强** (`ui/pages/merge.py`, `ui/pages/subtitle.py`)：
+  - 针对视频合并（Concat 拼接）和字幕烧录（Subtitles Filter 滤镜参数），进行了更严格的特殊字符（如空格、单引号、反斜杠及冒号）路径转义过滤，极大地降低了 macOS/Linux 在中文、空格、单引号路径下运行时 FFmpeg 报错崩溃的概率。
+
 ## 2026-06-02
 
 ### UI 重构

@@ -27,7 +27,8 @@ xref-*.html
 localpycs/
 
 # PyInstaller / executables
-bin/
+bin/*
+!bin/请将ffmpeg与ffprobe放在此处.txt
 
 # OS files
 Thumbs.db

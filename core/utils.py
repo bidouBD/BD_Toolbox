@@ -19,8 +19,30 @@ def get_resource_path(relative_path):
     return relative_path
 
 def get_ffprobe_path():
-    p = get_resource_path(os.path.join("bin", "ffprobe.exe"))
-    return p if os.path.exists(p) else 'ffprobe'
+    binary_name = "ffprobe.exe" if os.name == 'nt' else "ffprobe"
+    bundled = get_resource_path(os.path.join("bin", binary_name))
+    if os.path.exists(bundled):
+        return bundled
+
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).parent
+        for candidate in (
+            exe_dir / "bin" / binary_name,
+            exe_dir.parent / "Resources" / "bin" / binary_name,
+        ):
+            if candidate.exists():
+                return str(candidate)
+
+    if os.name != "nt":
+        for candidate in (
+            Path("/opt/homebrew/bin") / binary_name,
+            Path("/usr/local/bin") / binary_name,
+            Path("/usr/bin") / binary_name,
+        ):
+            if candidate.exists():
+                return str(candidate)
+
+    return binary_name
 
 
 def get_video_info(filepath):

@@ -30,6 +30,7 @@ class BDToolbox:
         from ui.pages.gif import GifPage
         from ui.pages.subtitle import SubtitlesPage
         from ui.pages.lab import LabPage
+        from ui.pages.help import HelpPage
 
         class MainWindow(FluentWindow):
             def __init__(self):
@@ -46,9 +47,16 @@ class BDToolbox:
                 # App icon
                 try:
                     from core.ffmpeg_runner import get_resource_path
-                    icon_path = get_resource_path("bd_toolbox.ico")
-                    if os.path.exists(icon_path):
-                        self.setWindowIcon(QIcon(icon_path))
+                    icon_candidates = (
+                        ["bd_toolbox.icns", "bd_toolbox.png", "bd_toolbox.ico"]
+                        if sys.platform == "darwin"
+                        else ["bd_toolbox.ico", "bd_toolbox.png"]
+                    )
+                    for icon_name in icon_candidates:
+                        icon_path = get_resource_path(icon_name)
+                        if os.path.exists(icon_path):
+                            self.setWindowIcon(QIcon(icon_path))
+                            break
                 except Exception:
                     pass
 
@@ -70,6 +78,7 @@ class BDToolbox:
                 from ui.pages.gif import GifPage
                 from ui.pages.subtitle import SubtitlesPage
                 from ui.pages.lab import LabPage
+                from ui.pages.help import HelpPage
 
                 # Group: Core Tools
                 self.navigationInterface.addSeparator(NavigationItemPosition.SCROLL)
@@ -92,7 +101,11 @@ class BDToolbox:
                 self.addSubInterface(LabPage(self),      FluentIcon.BROOM,    "视频实验室",
                                      position=NavigationItemPosition.SCROLL)
 
-                # Bottom: theme toggle
+                # Bottom: help document and theme toggle
+                help_icon = getattr(FluentIcon, "HELP", FluentIcon.DOCUMENT)
+                self.addSubInterface(HelpPage(self), help_icon, "帮助文档",
+                                     position=NavigationItemPosition.BOTTOM)
+
                 self.navigationInterface.addItem(
                     routeKey="theme_toggle",
                     icon=FluentIcon.CONSTRACT,

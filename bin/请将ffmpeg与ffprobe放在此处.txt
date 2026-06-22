@@ -1,0 +1,6 @@
+请将您操作系统对应的 ffmpeg 和 ffprobe 执行文件放置在此文件夹中：
+- Windows: 放 ffmpeg.exe 和 ffprobe.exe
+- macOS / Linux: 放 ffmpeg 和 ffprobe（并确保赋予了可执行权限 chmod +x）
+
+💡 提示：
+如果您的操作系统中已经安装并配置了系统的 ffmpeg 环境变量（PATH），则不需要在此处放置任何文件，程序会自动识别并直接调用系统的 ffmpeg。

@@ -1,28 +1,35 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import sys
+import sysconfig
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 # 核心路径锁定
 cwd = os.getcwd()
-venv_path = os.path.join(cwd, '.venv')
-site_packages = os.path.join(venv_path, 'Lib', 'site-packages')
-
-# 显式寻找 PyQt6 的 DLL 目录（针对 3.13 特别加固）
-pyqt6_dir = os.path.join(site_packages, 'PyQt6')
-qt_bin_dir = os.path.join(pyqt6_dir, 'Qt6', 'bin')
+site_packages = sysconfig.get_paths()["purelib"]
 
 # 1. 收集资源
 qf_datas = collect_data_files('qfluentwidgets') if os.path.exists(os.path.join(site_packages, 'qfluentwidgets')) else []
+datas = []
+if os.path.exists('bin'):
+    datas.append(('bin', 'bin'))
+for icon_candidate in ('bd_toolbox.ico', 'bd_toolbox.icns', 'bd_toolbox.png'):
+    if os.path.exists(icon_candidate):
+        datas.append((icon_candidate, '.'))
+
+# Icon setting
+icon_file = 'bd_toolbox.ico'
+if sys.platform == 'darwin':
+    if os.path.exists('bd_toolbox.icns'):
+        icon_file = 'bd_toolbox.icns'
+    elif os.path.exists('bd_toolbox.png'):
+        icon_file = 'bd_toolbox.png'
 
 a = Analysis(
     ['main.py'],
-    pathex=[cwd], # 移除 site_packages 的直接注入，避免 PyInstaller 警告
+    pathex=[cwd],
     binaries=[],
-    datas=[
-        ('bin', 'bin'),
-        ('bd_toolbox.ico', '.'),
-    ] + qf_datas,
+    datas=datas + qf_datas,
     hiddenimports=[
         'PyQt6.QtCore',
         'PyQt6.QtGui',
@@ -58,7 +65,7 @@ exe = EXE(
     upx=True,
     console=False, 
     disable_windowed_traceback=False,
-    icon=['bd_toolbox.ico'],
+    icon=[icon_file] if icon_file else None,
 )
 
 coll = COLLECT(
@@ -71,3 +78,11 @@ coll = COLLECT(
     upx_exclude=[],
     name='BD_Toolbox',
 )
+
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        coll,
+        name='BD_Toolbox.app',
+        icon=icon_file if icon_file.endswith('.icns') else None,
+        bundle_identifier='com.bidou.bdtoolbox',
+    )

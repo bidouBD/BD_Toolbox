@@ -27,14 +27,44 @@ def get_resource_path(relative_path):
 
 def get_ffmpeg_path():
     """Get the path to ffmpeg executable."""
-    # Priority: bin/ffmpeg.exe, then system PATH
-    p = get_resource_path(os.path.join("bin", "ffmpeg.exe"))
-    return p if os.path.exists(p) else 'ffmpeg'
+    return _resolve_media_binary("ffmpeg")
 
 def get_ffprobe_path():
     """Get the path to ffprobe executable."""
-    p = get_resource_path(os.path.join("bin", "ffprobe.exe"))
-    return p if os.path.exists(p) else 'ffprobe'
+    return _resolve_media_binary("ffprobe")
+
+
+def _resolve_media_binary(name):
+    """Resolve ffmpeg/ffprobe across dev, PyInstaller, Windows, and macOS."""
+    binary_name = f"{name}.exe" if os.name == 'nt' else name
+    bundled = get_resource_path(os.path.join("bin", binary_name))
+    if os.path.exists(bundled):
+        return bundled
+
+    for candidate in _candidate_binary_paths(binary_name):
+        if os.path.exists(candidate):
+            return str(candidate)
+
+    return binary_name
+
+
+def _candidate_binary_paths(binary_name):
+    paths = []
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).parent
+        paths.extend([
+            exe_dir / "bin" / binary_name,
+            exe_dir.parent / "Resources" / "bin" / binary_name,
+        ])
+
+    if os.name != "nt":
+        paths.extend([
+            Path("/opt/homebrew/bin") / binary_name,
+            Path("/usr/local/bin") / binary_name,
+            Path("/usr/bin") / binary_name,
+        ])
+
+    return paths
 
 
 class FFmpegRunner:

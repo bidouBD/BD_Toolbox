@@ -95,11 +95,38 @@ pip install -r requirements.txt
 
 将 `ffmpeg.exe` 和 `ffprobe.exe` 放入项目根目录下的 `bin/` 文件夹，或确保它们已经加入系统 `PATH`。
 
+macOS/Linux 下二进制文件不带 `.exe` 后缀：
+
+```text
+bin/
+├── ffmpeg
+└── ffprobe
+```
+
+macOS 也可以用 Homebrew 安装：
+
+```bash
+brew install ffmpeg
+```
+
+程序会优先使用项目 `bin/` 中的二进制；如果不存在，会继续查找系统 `PATH`，以及 macOS 常见路径 `/opt/homebrew/bin`、`/usr/local/bin`、`/usr/bin`。如果要把 `.app` 发给没有安装 FFmpeg 的用户，建议仍然内置 `bin/ffmpeg` 和 `bin/ffprobe`。
+
 ### 3. 启动程序
 
 ```bash
 python main.py
 ```
+
+macOS 首次运行建议：
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+如果 macOS 提示 Qt 平台插件或窗口权限问题，先确认当前 Python 环境安装的是 PyQt6 与 PyQt6-Fluent-Widgets，并从终端启动查看完整报错。
 
 ---
 
@@ -111,7 +138,13 @@ python main.py
 python build_app.py
 ```
 
-打包结果会输出到 `dist/BD_Toolbox/`。`build/`、`dist/`、虚拟环境、缓存文件、日志文件和本地 FFmpeg 二进制文件不会提交到源码仓库。
+macOS 打包需在 macOS 本机执行：
+
+```bash
+python3 build_app.py
+```
+
+打包结果会输出到 `dist/BD_Toolbox/`；macOS 下会生成 `dist/BD_Toolbox.app`。如果需要 macOS 原生图标，可在项目根目录放置 `bd_toolbox.icns`。`build/`、`dist/`、虚拟环境、缓存文件、日志文件和本地 FFmpeg 二进制文件不会提交到源码仓库。
 
 ---
 

@@ -103,7 +103,7 @@ class MergePage(QWidget):
         list_file = Path(tempfile.gettempdir()) / "ffmpeg_merge_list.txt"
         with open(list_file, "w", encoding="utf-8") as f:
             for p in paths:
-                res_p = str(p).replace("\\", "/")
+                res_p = _escape_concat_path(p)
                 f.write(f"file '{res_p}'\n")
 
         out_dir = self._out_dir.get()
@@ -133,3 +133,8 @@ class MergePage(QWidget):
             self._progress.set(1.0)
         else:
             self._log.append("\n❌ 处理被中断或发生错误！")
+
+
+def _escape_concat_path(path) -> str:
+    """Escape file paths for FFmpeg concat list files."""
+    return str(path).replace("\\", "/").replace("'", "'\\''")
