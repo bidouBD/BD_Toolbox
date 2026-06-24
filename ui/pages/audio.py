@@ -205,7 +205,7 @@ class AudioPage(QWidget):
         else:
             cmd += ["-c:a", "copy"]
 
-        if not lossless and fmt not in ("wav",):
+        if not lossless:
             cmd += ["-b:a", bitrate_raw]
 
         if sample != "保持原始":

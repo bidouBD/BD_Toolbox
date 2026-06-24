@@ -1,5 +1,22 @@
 # 更新日志
 
+## 2026-06-24
+
+### 缺陷修复
+
+- **字幕烧录：Windows 含中文目录路径导致 FFmpeg Invalid argument** (`ui/pages/subtitle.py`)
+  - 在 Windows 下，当字幕文件路径含有中文或其他非 ASCII 字符时，直接传入 `subtitles` filter 会导致 FFmpeg 报 `Invalid argument` 错误。
+
+- **视频压缩：2-Pass 临时文件未清理** (`core/ffmpeg_runner.py`)
+  - FFmpeg 在 2-Pass 第一步会生成 `ffmpeg2pass-*.log` 和 `ffmpeg2pass-*.log.mbtree` 临时文件，处理完成后不会自动删除。
+
+
+- **音频提取：WAV 格式码率判断逻辑冗余** (`ui/pages/audio.py`)
+  - `_build_command` 中 `if not lossless and fmt not in ("wav",)` 条件冗余：WAV 已被包含在 `lossless` 列表中，`fmt not in ("wav",)` 在 `not lossless` 为真时永远不会匹配到 WAV。
+
+- **视频合并：concat 路径转义在 Windows 路径中无效** (`ui/pages/merge.py`)
+  - 原函数使用 Bash 风格的单引号转义（`'\''`），在 Windows 的 FFmpeg concat 列表文件中不被识别，会导致含单引号路径的文件合并失败。
+
 ## 2026-06-22
 
 ### 新增功能

@@ -3,6 +3,7 @@ Page: 视频合并
 PyQt6 + qfluentwidgets rewrite — logic identical to original.
 """
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -103,8 +104,10 @@ class MergePage(QWidget):
         list_file = Path(tempfile.gettempdir()) / "ffmpeg_merge_list.txt"
         with open(list_file, "w", encoding="utf-8") as f:
             for p in paths:
+                # _escape_concat_path returns a complete quoted path string
+                # (double-quoted on Windows, single-quoted on Unix)
                 res_p = _escape_concat_path(p)
-                f.write(f"file '{res_p}'\n")
+                f.write(f"file {res_p}\n")
 
         out_dir = self._out_dir.get()
         out_path = generate_output_path(paths[0], "_merged")
@@ -136,5 +139,20 @@ class MergePage(QWidget):
 
 
 def _escape_concat_path(path) -> str:
-    """Escape file paths for FFmpeg concat list files."""
-    return str(path).replace("\\", "/").replace("'", "'\\''")
+    """Escape file paths for FFmpeg concat list files.
+
+    FFmpeg concat demuxer supports both single-quoted and double-quoted paths.
+    - On Windows, single-quote escaping (Bash style '\\'' ) does not work;
+      use double-quoted paths instead, escaping only backslash and double-quote.
+    - On Unix/macOS, use single-quoted paths with proper escaping.
+    """
+    p = str(path).replace("\\", "/")
+    if os.name == "nt":
+        # Double-quote style: escape backslash (already converted) and "
+        p = p.replace('"', '\\"')
+        return f'"{p}"'
+    else:
+        # Single-quote style: escape existing single quotes
+        p = p.replace("'", "'\\''")
+        return f"'{p}'"
+

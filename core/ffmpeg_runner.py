@@ -3,6 +3,7 @@ import threading
 import os
 import re
 import sys
+import glob
 from pathlib import Path
 
 
@@ -149,6 +150,11 @@ class FFmpegRunner:
                 self.done_callback(False)
         finally:
             self.running = False
+            for leftover in glob.glob("ffmpeg2pass-*.log") + glob.glob("ffmpeg2pass-*.log.*"):
+                try:
+                    os.remove(leftover)
+                except OSError:
+                    pass
 
     def _log(self, msg):
         if self.log_callback:

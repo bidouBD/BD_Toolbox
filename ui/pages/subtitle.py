@@ -3,6 +3,10 @@ Page: 烧录字幕
 PyQt6 + qfluentwidgets rewrite — logic identical to original.
 """
 
+import os
+import shutil
+import tempfile
+
 from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
@@ -29,6 +33,7 @@ class SubtitlesPage(QWidget):
         self._runner = None
         self._video_path = None
         self._subtitle_path = None
+        self._temp_subtitle = None  # tracks any ASCII-safe temp copy
         self._build()
 
     def _build(self):
@@ -101,7 +106,9 @@ class SubtitlesPage(QWidget):
             out_path = str(Path(out_dir) / Path(out_path).name)
 
         info = get_video_info(self._video_path)
-        srt_p = _escape_subtitle_filter_path(self._subtitle_path)
+
+        srt_filter_path = _prepare_subtitle_path(self._subtitle_path)
+        srt_p = _escape_subtitle_filter_path(srt_filter_path)
         cmd = ["ffmpeg", "-y", "-i", self._video_path,
                "-vf", f"subtitles='{srt_p}'", "-c:a", "copy", out_path]
 
@@ -126,6 +133,28 @@ class SubtitlesPage(QWidget):
             self._progress.set(1.0)
         else:
             self._log.append("\n❌ 处理被中断或发生错误！")
+
+
+def _prepare_subtitle_path(path: str) -> str:
+    """On Windows, copy the subtitle to a pure-ASCII temp path to work around
+    FFmpeg's inability to handle multibyte characters in the subtitles filter.
+    Returns the original path unchanged on non-Windows platforms."""
+    if os.name != "nt":
+        return path
+    # Check whether the path is already pure ASCII
+    try:
+        path.encode("ascii")
+        return path  # no non-ASCII characters — safe to use directly
+    except UnicodeEncodeError:
+        pass
+    # Copy to a temp file with an ASCII-safe name
+    suffix = Path(path).suffix  # e.g. '.srt'
+    tmp = tempfile.NamedTemporaryFile(
+        suffix=suffix, prefix="bdtoolbox_sub_", delete=False
+    )
+    tmp.close()
+    shutil.copy2(path, tmp.name)
+    return tmp.name
 
 
 def _escape_subtitle_filter_path(path) -> str:
